@@ -15,7 +15,7 @@ namespace LanguageExt
         /// </summary>
         [Pure]
         public static Func<T1, Func<T2, R>> curry<T1, T2, R>(Func<T1, T2, R> f) =>
-            (T1 a) => (T2 b) => f(a, b);
+            a => b => f(a, b);
 
         /// <summary>
         /// Curry the function 'f' provided.

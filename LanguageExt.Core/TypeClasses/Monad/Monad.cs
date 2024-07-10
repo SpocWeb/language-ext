@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Diagnostics.Contracts;
-using System.Threading.Tasks;
 using LanguageExt.Attributes;
 
 namespace LanguageExt.TypeClasses
@@ -14,7 +13,7 @@ namespace LanguageExt.TypeClasses
     public interface Monad<MA, A> : 
         Monad<Unit, Unit, MA, A>, 
         Foldable<MA, A>,
-        Typeclass
+        Typeclass //where MA : Monad<MA, A> this prevents to make IEnumerable<A> a Monad!
     {
         /// <summary>
         /// Monad constructor function.  Provide the bound value A to construct
@@ -40,15 +39,15 @@ namespace LanguageExt.TypeClasses
         /// <summary>
         /// Monadic bind
         /// </summary>
-        /// <typeparam name="MONADB">Type-class of the return value</typeparam>
+        /// <typeparam name="MonadB">Type-class of the return value</typeparam>
         /// <typeparam name="MB">Type of the monad to return</typeparam>
         /// <typeparam name="B">Type of the bound return value</typeparam>
         /// <param name="ma">Monad to bind</param>
         /// <param name="f">Bind function</param>
         /// <returns>Monad of type `MB` derived from Monad of `B`</returns>
         [Pure]
-        MB Bind<MONADB, MB, B>(MA ma, Func<A, MB> f) 
-            where MONADB : struct, Monad<Env, Out, MB, B>;
+        MB Bind<MonadB, MB, B>(MA ma, Func<A, MB> f) 
+            where MonadB : struct, Monad<Env, Out, MB, B>;
 
         [Pure]
         MB BindAsync<MonadB, MB, B>(MA ma, Func<A, MB> f) 
@@ -67,7 +66,7 @@ namespace LanguageExt.TypeClasses
         /// effectively. Then the instance can be used as a generic argument constrained 
         /// to:
         /// 
-        ///     where MonadA : struct, Monad<Env, Out, MA, A>
+        ///     where MonadA : struct, Monad&lt;Env, Out, MA, A>
         /// 
         /// And any consumer of the argument can call:
         ///
@@ -93,27 +92,27 @@ namespace LanguageExt.TypeClasses
         /// compatible with the input type of `Unit` and the output type of `(W, bool)`.  It restricts 
         /// `MB` to be:
         /// 
-        ///     Monad<Unit, (W, bool), MB, B>
+        ///     Monad&lt;Unit, (W, bool), MB, B>
         /// 
         /// So, the Writer's `Bind` function calls `BindReturn` which double dispatches the job to the 
-        /// `BindReturn` function on `MONADB`.  This is very much like the Visitor pattern in OO land. 
+        /// `BindReturn` function on `MonadB`.  This is very much like the Visitor pattern in OO land. 
         /// 
-        ///     public MB Bind<MONADB, MB, B>(Writer<MonoidW, W, A> ma, Func<A, MB> f) 
-        ///         where MONADB : struct, Monad<Unit, (W, bool), MB, B> =>
-        ///             default(MONADB).Id(_ =>
+        ///     public MB Bind&lt;MonadB, MB, B>(Writer&lt;MonoidW, W, A> ma, Func&lt;A, MB> f) 
+        ///         where MonadB : struct, Monad&lt;Unit, (W, bool), MB, B> =>
+        ///             default(MonadB).Id(_ =>
         ///             {
         ///                 var(a, output1, faulted) = ma();
         ///                 return faulted
-        ///                     ? default(MONADB).Fail()
-        ///                     : default(MONADB).BindReturn((output1, faulted), f(a));
+        ///                     ? default(MonadB).Fail()
+        ///                     : default(MonadB).BindReturn((output1, faulted), f(a));
         ///             });
         /// 
-        /// Usually `MONADB` would be another `Writer` instance, because you would normally bind a `Writer`
+        /// Usually `MonadB` would be another `Writer` instance, because you would normally bind a `Writer`
         /// with a `Writer`, but it could be any monad that has the same input and output arguments.
         /// The `BindReturn` function is then able to invoke `mb`, because it knows its own context and
         /// combine the output from `ma()` and the output of `mb`.
         /// 
-        ///     public Writer<MonoidW, W, A> BindReturn((W, bool) output, Writer<MonoidW, W, A> mb)
+        ///     public Writer&lt;MonoidW, W, A> BindReturn((W, bool) output, Writer&lt;MonoidW, W, A> mb)
         ///     {
         ///         var (b, output2, faulted) = mb();
         ///         return () => faulted
@@ -125,16 +124,16 @@ namespace LanguageExt.TypeClasses
         /// to Writers.  However simpler monads like `Option` can be bound to `Either`, `Try`, etc.  Because
         /// their `BindReturn` function looks like this:
         /// 
-        ///     public Option<A> BindReturn(Unit _, Option<A> mb) =>
+        ///     public Option&lt;A> BindReturn(Unit _, Option&lt;A> mb) =>
         ///         mb;
         /// 
         /// The `Bind` function for `Option` doesn't call `BindReturn` at all:
         /// 
-        ///     public MB Bind<MONADB, MB, B>(Option<A> ma, Func<A, MB> f) 
-        ///         where MONADB : struct, Monad<Unit, Unit, MB, B> =>
+        ///     public MB Bind&lt;MonadB, MB, B>(Option&lt;A> ma, Func&lt;A, MB> f) 
+        ///         where MonadB : struct, Monad&lt;Unit, Unit, MB, B> =>
         ///             ma.IsSome && f != null
         ///                 ? f(ma.Value)
-        ///                 : default(MONADB).Fail();
+        ///                 : default(MonadB).Fail();
         /// 
         /// So why implement it?  If someone tries to return an `Option` from a `Bind` call with the
         /// source monad of another type, it may call `BindReturn`.  And the `Option` response would be
@@ -158,30 +157,30 @@ namespace LanguageExt.TypeClasses
         /// </summary>
         /// <remarks>
         /// For monads that don't take arguments, they will have an input type of `Unit`.  And so
-        /// implementing `Run` is as simple as (for `Option<A>`):
+        /// implementing `Run` is as simple as (for `Option&lt;A>`):
         /// 
-        ///     public Option<A> Run(Func<Unit, Option<A>> ma) =>
+        ///     public Option&lt;A> Run(Func&lt;Unit, Option&lt;A>> ma) =>
         ///         ma(unit);
         /// 
         /// The most complex example is the `State` monad.  It takes a type `S` which is the input state:
         /// 
-        ///     public State<S, A> Run(Func<S, State<S, A>> ma) => 
+        ///     public State&lt;S, A> Run(Func&lt;S, State&lt;S, A>> ma) => 
         ///         state => ma(state)(state);
         /// 
         /// That appears to be ignoring the return state of `ma(state)`, but if you look at the `Bind` and
         /// `BindReturn` functions for `MState`:
         /// 
-        ///     public MB Bind<MONADB, MB, B>(State<S, A> ma, Func<A, MB> f) 
-        ///         where MONADB : struct, Monad<S, (S State, bool IsFaulted), MB, B> =>
-        ///             default(MONADB).Run(state =>
+        ///     public MB Bind&lt;MonadB, MB, B>(State&lt;S, A> ma, Func&lt;A, MB> f) 
+        ///         where MonadB : struct, Monad&lt;S, (S State, bool IsFaulted), MB, B> =>
+        ///             default(MonadB).Run(state =>
         ///             {
         ///                 var (a, sa, faulted) = ma(state);
         ///                 return faulted
-        ///                     ? default(MONADB).Fail()
-        ///                     : default(MONADB).BindReturn((sa, faulted), f(a));
+        ///                     ? default(MonadB).Fail()
+        ///                     : default(MonadB).BindReturn((sa, faulted), f(a));
         ///             });
         ///
-        ///     public State<S, A> BindReturn((S State, bool IsFaulted) output, State<S, A> mb) =>
+        ///     public State&lt;S, A> BindReturn((S State, bool IsFaulted) output, State&lt;S, A> mb) =>
         ///         _ => mb(output.State);
         ///  
         /// It should be clear that `Run` accepts the state (the first `state` in `ma(state)(state)`), and
@@ -190,11 +189,11 @@ namespace LanguageExt.TypeClasses
         /// 
         /// Simple monads that don't take parameters simply ignore this in thier `Bind` functions:
         /// 
-        ///     public MB Bind<MONADB, MB, B>(Option<A> ma, Func<A, MB> f) 
-        ///         where MONADB : struct, Monad<Unit, Unit, MB, B> =>
+        ///     public MB Bind&lt;MonadB, MB, B>(Option&lt;A> ma, Func&lt;A, MB> f) 
+        ///         where MonadB : struct, Monad&lt;Unit, Unit, MB, B> =>
         ///             ma.IsSome && f != null
         ///                 ? f(ma.Value)
-        ///                 : default(MONADB).Fail();
+        ///                 : default(MonadB).Fail();
         /// 
         /// The `Run` function would allow two monads of different types to be bound as long as their input
         /// and output types are the same.

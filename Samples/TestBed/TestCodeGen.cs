@@ -9,11 +9,13 @@
 using System;
 using System.Diagnostics.Contracts;
 using System.IO;
+using System.Reflection.PortableExecutable;
 using System.Threading.Tasks;
 using LanguageExt;
 using LanguageExt.ClassInstances;
 using LanguageExt.Common;
 using LanguageExt.TypeClasses;
+using Records;
 using static LanguageExt.Prelude;
 
 namespace TestBed
