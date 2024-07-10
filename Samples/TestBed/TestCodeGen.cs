@@ -84,7 +84,7 @@ namespace TestBed
     }
 
     [Free]
-    public interface Maybe<A>
+    internal interface Maybe<A>
     {
         [Pure] A Just(A value);
         [Pure] A Nothing();
@@ -241,7 +241,7 @@ namespace TestBed
     }
 
     [Union]
-    public interface MaybeUnion<A>
+    internal interface MaybeUnion<A>
     {
         MaybeUnion<A> JustValue(A value);
         MaybeUnion<A> NothingValue();
